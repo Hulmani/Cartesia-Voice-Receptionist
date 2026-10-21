@@ -1,0 +1,20 @@
+{
+  "name": "Maple Physiotherapy",
+  "fictional": true,
+  "timezone": "America/Toronto",
+  "hours": "Monday–Friday 9am–6pm, Saturday 10am–2pm; closed Sunday",
+  "arrival": "Arrive 10 minutes early wearing comfortable clothes.",
+  "services": [
+    {"id":"assessment","name":"Initial physiotherapy assessment","minutes":60,"priceCAD":120},
+    {"id":"followup","name":"Follow-up physiotherapy","minutes":30,"priceCAD":80}
+  ],
+  "therapists": [
+    {"id":"priya","name":"Priya Shah","services":["assessment","followup"]},
+    {"id":"alex","name":"Alex Chen","services":["assessment","followup"]}
+  ],
+  "slotTemplates": [
+    {"id":"slot-1","dayOffset":1,"time":"10:00","therapistId":"priya","serviceId":"assessment"},
+    {"id":"slot-2","dayOffset":1,"time":"14:00","therapistId":"alex","serviceId":"followup"},
+    {"id":"slot-3","dayOffset":5,"time":"14:00","therapistId":"priya","serviceId":"assessment"}
+  ]
+}

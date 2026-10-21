@@ -1,0 +1,7 @@
+const fs=require('node:fs'),ts=require('typescript');
+const {DatabaseSync}=require('node:sqlite');
+function load(path,imports={}){const exports={};new Function('require','exports',ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText)(name=>imports[name]||require(name),exports);return exports;}
+const clinic=load('app/demo/clinic.ts',{'./clinic.json':JSON.parse(fs.readFileSync('app/demo/clinic.json'))});
+const repository=load('db/appointments.ts',{'../app/demo/clinic':clinic});
+function database(path=':memory:',migrate=true){const sql=new DatabaseSync(path);sql.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');if(migrate)sql.exec(fs.readFileSync('drizzle/0000_same_risque.sql','utf8'));const db={prepare(query){return {bind(...params){return {async first(){return sql.prepare(query).get(...params)||null},async run(){const r=sql.prepare(query).run(...params);return {success:true,meta:{changes:r.changes}}},query,params}},query,params:[]}},async batch(items){sql.exec('BEGIN');try{const result=items.map(s=>{const p=sql.prepare(s.query);return {success:true,results:s.query.startsWith('SELECT')?p.all(...s.params):(p.run(...s.params),[])}});sql.exec('COMMIT');return result}catch(e){sql.exec('ROLLBACK');throw e}}};return {sql,db};}
+module.exports={load,clinic,repository,database};

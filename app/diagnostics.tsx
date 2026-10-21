@@ -1,0 +1,17 @@
+"use client";
+import {useState} from 'react';
+export type TurnDiagnostic={id:string;source:string;started:string;marks:Record<string,number>;errors:{stage:string;status:number;reference:string}[];retry:boolean;status:string};
+export function newDiagnostic(source:string,retry=false):TurnDiagnostic{return {id:crypto.randomUUID(),source,started:new Date().toISOString(),marks:{},errors:[],retry,status:'In progress'};}
+export function stamp(d:TurnDiagnostic,key:string,time=performance.now()){d.marks[key]=time;}
+export function diagnosticError(d:TurnDiagnostic,stage:string,error:unknown){const e=error as {status?:number;reference?:string};d.errors.push({stage,status:e?.status||0,reference:e?.reference||''});d.status='Failed';}
+export function metrics(d:TurnDiagnostic){const delta=(a:string,b:string)=>d.marks[a]!==undefined&&d.marks[b]!==undefined?Math.max(0,d.marks[b]-d.marks[a]):null;return [
+ ['Total response delay (estimated)',delta('speechEnd','playback')],
+ ['Speech detection delay (estimated)',delta('speechEnd','detected')],
+ ['Transcription + network',delta('transcribe','transcribed')],
+ ['Gemini full reply + network/tools',delta('request','reply')],
+ ['Voice first chunk + network',delta('speechRequest','chunk')],
+ ['Playback scheduling delay (estimated)',delta('chunk','playback')],
+ ['Detected interruption → stop command',delta('interrupt','stopped')],
+ ['Send → playback (estimated)',delta('request','playback')]
+ ] as [string,number|null][];}
+export default function Diagnostics({turns}:{turns:TurnDiagnostic[]}){const [copy,setCopy]=useState('');const payload=JSON.stringify({version:1,note:'Milliseconds. Speech end uses the last VAD speech frame; playback is estimated from the audio schedule, not acoustic measurement. Stage timings include network/server work. No transcripts or recordings.',turns:turns.map(d=>({...d,metrics:Object.fromEntries(metrics(d))}))},null,2);return <details className="latency-diagnostics"><summary>Diagnostics · response timing</summary><p className="hint">Latest 20 attempts, in milliseconds. Estimated speech end comes from the last speech frame. Playback uses the Web Audio schedule; device output latency is not measured. Unavailable means a stage has not completed or cannot be measured. No transcripts or recordings are included.</p><button type="button" className="secondary" disabled={!turns.length} onClick={async()=>{try{await navigator.clipboard.writeText(payload);setCopy('Copied diagnostics.')}catch{setCopy('Copy unavailable. Select the diagnostics text below.')}}}>Copy diagnostics</button><p role="status">{copy}</p>{!turns.length&&<p>Ask a question to capture timings.</p>}{[...turns].reverse().map((d,i)=><section key={d.id}><h3>{i===0?'Latest attempt':`Earlier attempt ${i}`} · {d.source}{d.retry?' · Retry':''}</h3><p>{d.status} · {new Date(d.started).toLocaleTimeString()}</p><dl>{metrics(d).map(([label,value])=><div key={label} style={{display:'flex',justifyContent:'space-between',gap:16,padding:'5px 0',flexWrap:'wrap'}}><dt>{label}</dt><dd style={{margin:0,fontVariantNumeric:'tabular-nums'}}>{value===null?'Unavailable':`${Math.round(value)} ms`}</dd></div>)}</dl>{d.errors.map((e,j)=><p key={j}>Error: {e.stage}{e.status?` · HTTP ${e.status}`:''}{e.reference?` · Request ${e.reference}`:''}</p>)}</section>)}<details><summary>Diagnostic data</summary><textarea aria-label="Diagnostic data to copy" readOnly value={payload} style={{width:'100%',minHeight:180}}/></details></details>;}
