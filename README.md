@@ -1,0 +1,25 @@
+# Manoj's Voice Lab — Step 1
+Browser text-to-speech using a server-side Cartesia request. Private Site.
+
+Configure the secret CARTESIA_API_KEY in Sites runtime environment variables, then deploy to apply. Never put this key in client code. Obtain a key at https://play.cartesia.ai/keys.
+
+The browser POSTs {text} to /api/speech. The server validates a maximum of 1,000 characters, calls Cartesia /tts/bytes with API version 2026-08-14 and sonic-3.6, and returns WAV audio. The browser buffers the whole response for native audio playback and download. Response timing is full download time, not time to first byte. Replays reuse the local blob and do not call Cartesia.
+
+Without the secret, the interface explicitly shows setup needed and disables generation. No mock audio or browser TTS fallback. End-to-end speech validation needs an active Cartesia key and credits. Keep owner-private; access policy must be reviewed before public deployment.
+
+## Session key testing
+When a server key is absent, enter a separate test key in the password field. It lives in React state only (no localStorage, sessionStorage, cookies, files, or database). Generate sends it to the same-origin backend in X-Cartesia-Test-Key over HTTPS; only the server forwards it to api.cartesia.ai in Authorization. The handler never logs or reflects keys or upstream error bodies. Refresh, pagehide, or Clear key removes the page state. In-flight requests still hold their request credential until they finish. Browser/device compromise remains a risk. Do not make this Site public without re-reviewing authentication and abuse controls.
+
+## Step 2 and tabs
+Speak and Listen tabs share the session key and keep their state while switching. Converse is marked coming soon. Listen uses getUserMedia and MediaRecorder, selects a supported WebM/MP4/Ogg format, stops after 60 seconds, and releases microphone tracks after stopping or leaving. Press Transcribe to explicitly upload to /api/transcribe, which sends multipart audio to Cartesia POST /stt with ink-whisper, language en, and API version 2026-08-14. The route caps the body at 9 MiB and the recording at 8 MiB, validates input/origin, handles timeouts and hides upstream error bodies. The user can replay locally and send a transcript up to 1,000 characters into Speak. No persistent recording/transcript storage. Browser microphone and live Cartesia STT still require user testing; MP4/WebM request handling was verified with mocked upstream responses.
+
+## Step 3: Converse
+Step 3 uses Gemini 3.8 Flash through the Google Gemini API. Gemini and Cartesia keys are loaded exclusively from protected server environment bindings, GEMINI_API_KEY and CARTESIA_API_KEY. There are no key-entry fields or client-supplied key headers. Refreshes do not clear server credentials. Configuration endpoints return booleans only. Use a free-tier Google project; quotas apply. Billing-enabled projects may incur charges. Free-tier content may be used by Google to improve its products; fictional data only. Cartesia remains responsible for transcription and speech generation.
+
+The fictional clinic is defined in `app/demo/clinic.json`. Three appointment templates produce upcoming dates in Toronto time. Gemini can call `check_availability` and `propose_booking`; the backend validates slot IDs and returns a proposal without creating a booking. The user must press Confirm demo booking. That separate server action validates the snapshot and slot and returns a deterministic demo reference. Retrying the same slot with the updated snapshot returns the existing booking. The board displays booked slots and a JSON view. Reset demo clears bookings and history; New conversation clears only history. Typed chat works with only a Gemini key; microphone/audio also need Cartesia.
+
+**Simulation boundary:** state is held in the open browser page and supplied to the backend on each request. It is not durable, shared across visitors/tabs, or authoritative clinic data. Refresh resets it. This is deliberately not a production booking or concurrency mechanism. There is no Jane connection, no real patient data, and no cancellation/rescheduling workflow. Production needs authorized booking-system access and durable server-controlled state with transactional booking and idempotency.
+
+Six recent exchanges accompany each question. Requests run one turn at a time. LLM errors preserve the question for retry; TTS errors preserve successful text and booking state, with audio-only retry. Mobile browsers may require pressing Play. Keys and upstream errors are not logged or returned. There is no automatic paid-model fallback.
+
+Validation: `node scripts/test-converse.cjs` tests origin and history validation, Gemini tool forwarding, proposal without mutation, confirmed booking, duplicate retry, bad state/slot rejection, availability after booking, quota and network errors. These use mocked Gemini responses. TypeScript and production build are also checked. Browser and microphone testing still require a supported browser testing environment.
